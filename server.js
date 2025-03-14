@@ -29,10 +29,14 @@ io.on("connection", (socket) => {
 
 // Bluecode Transaction Callback URL
 app.post("/transaction-callback", (req, res) => {
+  console.log("inside transaction callback");
   const secretKey = process.env.MERCHANT_SECRET_KEY; // Load from .env
   const signatureHeader = req.headers["x-blue-code-signature"];
 
+  console.log("signature: ", signatureHeader);
+
   if (!signatureHeader) {
+    io.emit("error", "Missing signature");
     return res.status(400).json({ error: "Missing signature" });
   }
 
@@ -41,14 +45,19 @@ app.post("/transaction-callback", (req, res) => {
     .split(",")
     .map((s) => s.split("=")[1]);
 
+  console.log("bodyString: ", bodyString);
+
   // Generate HMAC-SHA256 signature
   const calculatedSignature = crypto
     .createHmac("sha256", secretKey)
     .update(`${timestamp}.${bodyString}`)
     .digest("hex");
 
+  console.log("calc signature: ", calculatedSignature);
+
   // Verify signature
   if (calculatedSignature !== receivedSignature) {
+    io.emit("error", "Invalid signature");
     return res.status(403).json({ error: "Invalid signature" });
   }
 
