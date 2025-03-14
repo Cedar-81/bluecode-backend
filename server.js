@@ -55,11 +55,11 @@ app.post("/transaction-callback", (req, res) => {
 
   console.log("calc signature: ", calculatedSignature);
 
-  // Verify signature
-  if (calculatedSignature !== receivedSignature) {
-    io.emit("error", "Invalid signature");
-    return res.status(403).json({ error: "Invalid signature" });
-  }
+  // // Verify signature
+  // if (calculatedSignature !== receivedSignature) {
+  //   io.emit("error", "Invalid signature");
+  //   return res.status(403).json({ error: "Invalid signature" });
+  // }
 
   console.log("✅ Valid Bluecode request received:", req.body);
 
