@@ -15,6 +15,8 @@ app.use(bodyParser.json());
 
 // Store connected clients
 let clients = [];
+// Store latest transaction update for polling
+let latestTransaction = null;
 
 // Handle WebSocket connections
 io.on("connection", (socket) => {
@@ -27,7 +29,7 @@ io.on("connection", (socket) => {
   });
 });
 
-// Bluecode Transaction Callback URL
+// Bluecode Transaction Callback URL (Webhook)
 app.post("/transaction-callback", (req, res) => {
   console.log("inside transaction callback");
   const secretKey = process.env.MERCHANT_SECRET_KEY; // Load from .env
@@ -55,7 +57,7 @@ app.post("/transaction-callback", (req, res) => {
 
   console.log("calc signature: ", calculatedSignature);
 
-  // // Verify signature
+  // Uncomment this block to verify signature
   // if (calculatedSignature !== receivedSignature) {
   //   io.emit("error", "Invalid signature");
   //   return res.status(403).json({ error: "Invalid signature" });
@@ -63,10 +65,21 @@ app.post("/transaction-callback", (req, res) => {
 
   console.log("✅ Valid Bluecode request received:", req.body);
 
+  // Store latest transaction update
+  latestTransaction = req.body;
+
   // Emit update to connected clients via WebSocket
   io.emit("transaction_update", req.body);
 
   res.status(200).json({ message: "Transaction update received" });
+});
+
+// HTTP Route for Polling Transaction Status
+app.get("/transaction-status", (req, res) => {
+  if (!latestTransaction) {
+    return res.status(404).json({ message: "No transaction update available" });
+  }
+  res.json(latestTransaction);
 });
 
 // Start server
