@@ -15,8 +15,9 @@ app.use(bodyParser.json());
 
 // Store connected clients
 let clients = [];
-// Store latest transaction update for polling
+// Store the latest transaction and its timestamp
 let latestTransaction = null;
+let transactionPending = false;
 
 // Handle WebSocket connections
 io.on("connection", (socket) => {
@@ -32,9 +33,9 @@ io.on("connection", (socket) => {
 // Bluecode Transaction Callback URL (Webhook)
 app.post("/transaction-callback", (req, res) => {
   console.log("inside transaction callback");
-  const secretKey = process.env.MERCHANT_SECRET_KEY; // Load from .env
-  const signatureHeader = req.headers["x-blue-code-signature"];
 
+  const secretKey = process.env.MERCHANT_SECRET_KEY;
+  const signatureHeader = req.headers["x-blue-code-signature"];
   console.log("signature: ", signatureHeader);
 
   if (!signatureHeader) {
@@ -65,21 +66,36 @@ app.post("/transaction-callback", (req, res) => {
 
   console.log("✅ Valid Bluecode request received:", req.body);
 
-  // Store latest transaction update
-  latestTransaction = req.body;
+  // Store the latest transaction
+  latestTransaction = {
+    ...req.body,
+    timestamp: Date.now(), // Add timestamp to track freshness
+  };
+
+  // Mark transaction as pending
+  transactionPending = false;
 
   // Emit update to connected clients via WebSocket
-  io.emit("transaction_update", req.body);
+  io.emit("transaction_update", latestTransaction);
 
   res.status(200).json({ message: "Transaction update received" });
 });
 
 // HTTP Route for Polling Transaction Status
 app.get("/transaction-status", (req, res) => {
-  if (!latestTransaction) {
+  if (!latestTransaction || transactionPending) {
     return res.status(404).json({ message: "No transaction update available" });
   }
+
   res.json(latestTransaction);
+});
+
+// Clear transaction data when a new payment starts
+app.post("/start-transaction", (req, res) => {
+  console.log("🆕 New transaction started. Clearing old data.");
+  latestTransaction = null;
+  transactionPending = true; // Mark as waiting for a new update
+  res.json({ message: "Transaction reset. Awaiting new payment." });
 });
 
 // Start server
